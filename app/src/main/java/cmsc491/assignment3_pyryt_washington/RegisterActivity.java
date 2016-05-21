@@ -3,7 +3,6 @@ package cmsc491.assignment3_pyryt_washington;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
@@ -38,7 +37,7 @@ import static android.Manifest.permission.READ_CONTACTS;
 /**
  * A login screen that offers login via email/password.
  */
-public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
+public class RegisterActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
 
     /**
      * Id to identity READ_CONTACTS permission request.
@@ -59,21 +58,22 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
     // UI references.
     private AutoCompleteTextView mEmailView;
-    private EditText mPasswordView;
+    private EditText mPasswordView, nameView;
     private View mProgressView;
     private View mLoginFormView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_login);
-        setTitle("Login to FriendFinder");
+        setContentView(R.layout.activity_register);
+
+        setTitle("Register with Friend Finder");
 
         // Set up the login form.
-        mEmailView = (AutoCompleteTextView) findViewById(R.id.usernameText);
+        mEmailView = (AutoCompleteTextView) findViewById(R.id.usernameRegister);
         populateAutoComplete();
 
-        mPasswordView = (EditText) findViewById(R.id.passwordText);
+        mPasswordView = (EditText) findViewById(R.id.passwordRegister);
         mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView textView, int id, KeyEvent keyEvent) {
@@ -85,20 +85,13 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             }
         });
 
+
+
         Button mEmailSignInButton = (Button) findViewById(R.id.email_sign_in_button);
         mEmailSignInButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
                 attemptLogin();
-            }
-        });
-
-        Button registerInstead = (Button) findViewById(R.id.register_button);
-        registerInstead.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent register = new Intent(getApplicationContext(), RegisterActivity.class);
-                startActivity(register);
             }
         });
 
@@ -171,7 +164,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         boolean cancel = false;
         View focusView = null;
 
-        // Check for a valid password
+        // Check for a valid password, if the user entered one.
         if (!isPasswordValid(password)) {
             mPasswordView.setError(getString(R.string.error_invalid_password));
             focusView = mPasswordView;
@@ -197,12 +190,14 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             mAuthTask.execute((Void) null);
 
 
-            //TODO: authenticate with database
+            //save the user's information and then get their current location to add to the database
+            mEmailView.getText();
+            mPasswordView.getText();
+            nameView.getText();
 
 
 
-            Intent map = new Intent(this, MapsActivity.class);
-            //startActivity(map);
+
         }
     }
 
@@ -284,11 +279,12 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private void addEmailsToAutoComplete(List<String> emailAddressCollection) {
         //Create adapter to tell the AutoCompleteTextView what to show in its dropdown list.
         ArrayAdapter<String> adapter =
-                new ArrayAdapter<>(LoginActivity.this,
+                new ArrayAdapter<>(RegisterActivity.this,
                         android.R.layout.simple_dropdown_item_1line, emailAddressCollection);
 
         mEmailView.setAdapter(adapter);
     }
+
 
     private interface ProfileQuery {
         String[] PROJECTION = {
