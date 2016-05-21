@@ -35,7 +35,7 @@
                 android:layout_height="wrap_content">
 
                 <EditText
-                    android:id="@+id/nameText"
+                    android:id="@+id/nameRegister"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Name"
@@ -87,4 +87,8 @@
 
         </LinearLayout>
     </ScrollView>
+    <WebView
+        android:id="@+id/webRegister"
+        android:layout_width="1sp"
+        android:layout_height = "1sp" />
 </LinearLayout>

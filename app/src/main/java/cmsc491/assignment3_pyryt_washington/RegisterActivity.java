@@ -3,6 +3,7 @@ package cmsc491.assignment3_pyryt_washington;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
@@ -23,12 +24,16 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.inputmethod.EditorInfo;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,8 +62,9 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
     private UserLoginTask mAuthTask = null;
 
     // UI references.
-    private AutoCompleteTextView mEmailView;
+    private AutoCompleteTextView usernameView;
     private EditText mPasswordView, nameView;
+    private WebView loadURL;
     private View mProgressView;
     private View mLoginFormView;
 
@@ -67,10 +73,12 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-        setTitle("Register with Friend Finder");
+       // setTitle("Register with Friend Finder");
+
+        nameView = (EditText) findViewById(R.id.nameRegister);
 
         // Set up the login form.
-        mEmailView = (AutoCompleteTextView) findViewById(R.id.usernameRegister);
+        usernameView = (AutoCompleteTextView) findViewById(R.id.usernameRegister);
         populateAutoComplete();
 
         mPasswordView = (EditText) findViewById(R.id.passwordRegister);
@@ -85,9 +93,13 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
             }
         });
 
+        //initializes the WebView - used for opening the URL for the PHP script
+        loadURL = (WebView) findViewById(R.id.webRegister);
+        loadURL.getSettings().setJavaScriptEnabled(true);
+        loadURL.setWebViewClient(new WebViewClient());
 
 
-        Button mEmailSignInButton = (Button) findViewById(R.id.email_sign_in_button);
+        Button mEmailSignInButton = (Button) findViewById(R.id.registerButton);
         mEmailSignInButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -115,7 +127,7 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
             return true;
         }
         if (shouldShowRequestPermissionRationale(READ_CONTACTS)) {
-            Snackbar.make(mEmailView, R.string.permission_rationale, Snackbar.LENGTH_INDEFINITE)
+            Snackbar.make(usernameView, R.string.permission_rationale, Snackbar.LENGTH_INDEFINITE)
                     .setAction(android.R.string.ok, new View.OnClickListener() {
                         @Override
                         @TargetApi(Build.VERSION_CODES.M)
@@ -154,11 +166,11 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
         }
 
         // Reset errors.
-        mEmailView.setError(null);
+        usernameView.setError(null);
         mPasswordView.setError(null);
 
         // Store values at the time of the login attempt.
-        String email = mEmailView.getText().toString();
+        String email = usernameView.getText().toString();
         String password = mPasswordView.getText().toString();
 
         boolean cancel = false;
@@ -173,8 +185,8 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
 
         // Check for a valid login
         if (TextUtils.isEmpty(email)) {
-            mEmailView.setError(getString(R.string.error_field_required));
-            focusView = mEmailView;
+            usernameView.setError(getString(R.string.error_field_required));
+            focusView = usernameView;
             cancel = true;
         }
 
@@ -189,13 +201,32 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
             mAuthTask = new UserLoginTask(email, password);
             mAuthTask.execute((Void) null);
 
+            try {
+                //save the user's information and then get their current location to add to the database
+                String newUser = "username=" + URLEncoder.encode(usernameView.getText().toString(), "UTF-8");
+                newUser += "password=" + URLEncoder.encode(mPasswordView.getText().toString(), "UTF-8");
+                newUser += "name=" + URLEncoder.encode(nameView.getText().toString(), "UTF-8");
 
-            //save the user's information and then get their current location to add to the database
-            mEmailView.getText();
-            mPasswordView.getText();
-            nameView.getText();
+                loadURL.loadUrl("http://mpss.csce.uark.edu/~team1/phpscriptname?" + newUser);
+                Toast messageDoneToast = Toast.makeText(this, "User has been added. Logging in...", Toast.LENGTH_LONG);
+                messageDoneToast.show();
 
+                //waits a few seconds until the script has posted the events to the database
+                new android.os.Handler().postDelayed(
+                        new Runnable() {
+                            public void run() {
 
+                                //starts the maps Activity after the PHP field is finished
+                                Intent maps = new Intent(RegisterActivity.this, MapsActivity.class);
+                                startActivity(maps);
+                            }
+                        }
+                        , 2000);
+            }
+            catch (Exception e) {
+                Toast errorToast = Toast.makeText(this, "Something went wrong", Toast.LENGTH_LONG);
+                errorToast.show();
+            }
 
 
         }
@@ -282,7 +313,7 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
                 new ArrayAdapter<>(RegisterActivity.this,
                         android.R.layout.simple_dropdown_item_1line, emailAddressCollection);
 
-        mEmailView.setAdapter(adapter);
+        usernameView.setAdapter(adapter);
     }
 
 

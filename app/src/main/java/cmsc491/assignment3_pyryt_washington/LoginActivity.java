@@ -24,6 +24,8 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.inputmethod.EditorInfo;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
@@ -60,6 +62,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     // UI references.
     private AutoCompleteTextView mEmailView;
     private EditText mPasswordView;
+    private WebView loadURL;
     private View mProgressView;
     private View mLoginFormView;
 
@@ -85,6 +88,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             }
         });
 
+        //try to login when the login button is clicked
         Button mEmailSignInButton = (Button) findViewById(R.id.email_sign_in_button);
         mEmailSignInButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -93,6 +97,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             }
         });
 
+        //when the registerInstead button is clicked, the user is taken to a seperate
+        //  activity where they can register for an account instead of using an existing one
         Button registerInstead = (Button) findViewById(R.id.register_button);
         registerInstead.setOnClickListener(new OnClickListener() {
             @Override
@@ -104,6 +110,12 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
+
+
+        //initializes the WebView - used for opening the URL for the PHP script
+        loadURL = (WebView) findViewById(R.id.webLogin);
+        loadURL.getSettings().setJavaScriptEnabled(true);
+        loadURL.setWebViewClient(new WebViewClient());
     }
 
     private void populateAutoComplete() {
@@ -202,7 +214,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
 
             Intent map = new Intent(this, MapsActivity.class);
-            //startActivity(map);
+            startActivity(map);
         }
     }
 
