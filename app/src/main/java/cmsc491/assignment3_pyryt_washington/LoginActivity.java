@@ -62,7 +62,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     // UI references.
     private AutoCompleteTextView mEmailView;
     private EditText mPasswordView;
-    private WebView loadURL;
     private View mProgressView;
     private View mLoginFormView;
 
@@ -70,7 +69,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
-        setTitle("Login to FriendFinder");
+        setTitle("Login to Friend Finder");
 
         // Set up the login form.
         mEmailView = (AutoCompleteTextView) findViewById(R.id.usernameText);
@@ -111,11 +110,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
 
-
-        //initializes the WebView - used for opening the URL for the PHP script
-        loadURL = (WebView) findViewById(R.id.webLogin);
-        loadURL.getSettings().setJavaScriptEnabled(true);
-        loadURL.setWebViewClient(new WebViewClient());
+        //make an async task to start loading users in the background
     }
 
     private void populateAutoComplete() {
@@ -207,14 +202,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             showProgress(true);
             mAuthTask = new UserLoginTask(email, password);
             mAuthTask.execute((Void) null);
-
-
-            //TODO: authenticate with database
-
-
-
-            Intent map = new Intent(this, MapsActivity.class);
-            startActivity(map);
         }
     }
 
@@ -328,13 +315,19 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         @Override
         protected Boolean doInBackground(Void... params) {
-            // TODO: attempt authentication against a network service.
-
             try {
                 // Simulate network access.
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
                 return false;
+            }
+
+            //do the authentication of loggin the user in
+            try {
+
+            }
+            catch (Exception e) {
+
             }
 
             for (String credential : DUMMY_CREDENTIALS) {
@@ -344,8 +337,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                     return pieces[1].equals(mPassword);
                 }
             }
-
-            // TODO: register the new account here.
             return true;
         }
 
@@ -354,7 +345,10 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             mAuthTask = null;
             showProgress(false);
 
+            //if the login is successful, end this activity and start the map activity
             if (success) {
+                Intent map = new Intent(LoginActivity.this, MapsActivity.class);
+                startActivity(map);
                 finish();
             } else {
                 mPasswordView.setError(getString(R.string.error_incorrect_password));

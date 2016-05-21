@@ -82,13 +82,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="@string/action_sign_in"
+                android:text="Register"
                 android:textStyle="bold" />
 
         </LinearLayout>
     </ScrollView>
-    <WebView
-        android:id="@+id/webRegister"
-        android:layout_width="1sp"
-        android:layout_height = "1sp" />
 </LinearLayout>

@@ -84,9 +84,4 @@
 
         </LinearLayout>
     </ScrollView>
-
-    <WebView
-        android:id="@+id/webLogin"
-        android:layout_width="1sp"
-        android:layout_height = "1sp" />
 </LinearLayout>

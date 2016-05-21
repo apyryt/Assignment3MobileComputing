@@ -38,7 +38,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        //for each line in the database, create
+        //for each line in the database, create a marker
 
 
         // Add a marker in Sydney and move the camera

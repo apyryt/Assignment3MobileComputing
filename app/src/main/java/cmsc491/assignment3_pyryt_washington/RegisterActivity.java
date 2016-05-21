@@ -24,8 +24,6 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.inputmethod.EditorInfo;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
@@ -33,7 +31,9 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.net.URLEncoder;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -64,7 +64,6 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
     // UI references.
     private AutoCompleteTextView usernameView;
     private EditText mPasswordView, nameView;
-    private WebView loadURL;
     private View mProgressView;
     private View mLoginFormView;
 
@@ -73,7 +72,7 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-       // setTitle("Register with Friend Finder");
+        setTitle("Register with Friend Finder");
 
         nameView = (EditText) findViewById(R.id.nameRegister);
 
@@ -92,11 +91,6 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
                 return false;
             }
         });
-
-        //initializes the WebView - used for opening the URL for the PHP script
-        loadURL = (WebView) findViewById(R.id.webRegister);
-        loadURL.getSettings().setJavaScriptEnabled(true);
-        loadURL.setWebViewClient(new WebViewClient());
 
 
         Button mEmailSignInButton = (Button) findViewById(R.id.registerButton);
@@ -172,6 +166,7 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
         // Store values at the time of the login attempt.
         String email = usernameView.getText().toString();
         String password = mPasswordView.getText().toString();
+        String name = nameView.getText().toString();
 
         boolean cancel = false;
         View focusView = null;
@@ -198,42 +193,15 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
             showProgress(true);
-            mAuthTask = new UserLoginTask(email, password);
+            mAuthTask = new UserLoginTask(email, password, name);
             mAuthTask.execute((Void) null);
-
-            try {
-                //save the user's information and then get their current location to add to the database
-                String newUser = "username=" + URLEncoder.encode(usernameView.getText().toString(), "UTF-8");
-                newUser += "password=" + URLEncoder.encode(mPasswordView.getText().toString(), "UTF-8");
-                newUser += "name=" + URLEncoder.encode(nameView.getText().toString(), "UTF-8");
-
-                loadURL.loadUrl("http://mpss.csce.uark.edu/~team1/phpscriptname?" + newUser);
-                Toast messageDoneToast = Toast.makeText(this, "User has been added. Logging in...", Toast.LENGTH_LONG);
-                messageDoneToast.show();
-
-                //waits a few seconds until the script has posted the events to the database
-                new android.os.Handler().postDelayed(
-                        new Runnable() {
-                            public void run() {
-
-                                //starts the maps Activity after the PHP field is finished
-                                Intent maps = new Intent(RegisterActivity.this, MapsActivity.class);
-                                startActivity(maps);
-                            }
-                        }
-                        , 2000);
-            }
-            catch (Exception e) {
-                Toast errorToast = Toast.makeText(this, "Something went wrong", Toast.LENGTH_LONG);
-                errorToast.show();
-            }
-
-
         }
     }
 
+    /*
+     * Password must be at least 4 characters long. Returns true if it meets this requirement or false otherwise
+     */
     private boolean isPasswordValid(String password) {
-        //TODO: Replace this with your own logic
         return password.length() > 4;
     }
 
@@ -333,18 +301,18 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
      */
     public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
 
-        private final String mEmail;
+        private final String mUsername;
         private final String mPassword;
+        private final String mName;
 
-        UserLoginTask(String email, String password) {
-            mEmail = email;
+        UserLoginTask(String username, String password, String name) {
+            mUsername = username;
             mPassword = password;
+            mName = name;
         }
 
         @Override
         protected Boolean doInBackground(Void... params) {
-            // TODO: attempt authentication against a network service.
-
             try {
                 // Simulate network access.
                 Thread.sleep(2000);
@@ -352,15 +320,40 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
                 return false;
             }
 
-            for (String credential : DUMMY_CREDENTIALS) {
-                String[] pieces = credential.split(":");
-                if (pieces[0].equals(mEmail)) {
-                    // Account exists, return true if the password matches.
-                    return pieces[1].equals(mPassword);
+            //open the URL for a post request to the database
+            try {
+                //String newUser = "http://mpss.csce.uark.edu/~team1/add_user.php?";
+                //newUser += "username=" + URLEncoder.encode(mUsername, "UTF-8");
+                //newUser += "&password=" + URLEncoder.encode(mPassword), "UTF-8");
+                //newUser += "&name=" + URLEncoder.encode(mName, "UTF-8");
+                String newUser = "http://mpss.csce.uark.edu/~team1/add_to_table.php?" + "eventName=finalTest";
+                URL url = new URL(newUser);
+                HttpURLConnection phpScript = (HttpURLConnection) url.openConnection();
+
+                //call the php script to add a new user to the database
+                try {
+                    phpScript.setDoInput(true);
+                    phpScript.setDoOutput(true);
+                    InputStreamReader in = new InputStreamReader(phpScript.getInputStream());
+                    //BufferedReader input = new BufferedReader(in);
+
+                    //display a message that the user has been added to the database
+                    //Toast messageDoneToast = Toast.makeText(RegisterActivity.this, "User has been added. Logging in...", Toast.LENGTH_LONG);
+                   // messageDoneToast.show();
+                }
+                catch (Exception e) {
+                   // Toast errorToast = Toast.makeText(RegisterActivity.this, "Something went wrong", Toast.LENGTH_LONG);
+                    //errorToast.show();
+                }
+                finally {
+                    phpScript.disconnect();
+
                 }
             }
-
-            // TODO: register the new account here.
+            catch (Exception e) {
+               // Toast errorToast = Toast.makeText(RegisterActivity.this, "Something went wrong", Toast.LENGTH_LONG);
+                //errorToast.show();
+            }
             return true;
         }
 
@@ -369,7 +362,11 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
             mAuthTask = null;
             showProgress(false);
 
+            //When we have logged in successfully, go to the maps page
             if (success) {
+
+                Intent maps = new Intent(getApplicationContext(), MapsActivity.class);
+                startActivity(maps);
                 finish();
             } else {
                 mPasswordView.setError(getString(R.string.error_incorrect_password));
