@@ -1,12 +1,17 @@
 package cmsc491.assignment3_pyryt_washington;
 
+import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.app.LoaderManager.LoaderCallbacks;
 
@@ -19,6 +24,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.support.v7.view.ActionMode;
 import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
@@ -32,6 +38,11 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,7 +51,7 @@ import static android.Manifest.permission.READ_CONTACTS;
 /**
  * A login screen that offers login via email/password.
  */
-public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
+public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor>, LocationListener {
 
     /**
      * Id to identity READ_CONTACTS permission request.
@@ -64,6 +75,11 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private EditText mPasswordView;
     private View mProgressView;
     private View mLoginFormView;
+
+    private LocationManager locManager;
+    private Location userLocation;
+
+    ArrayList<String> usersLocations;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,17 +125,44 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
-
-        //make an async task to start loading users in the background
     }
 
-    private void populateAutoComplete() {
+        private void populateAutoComplete() {
         if (!mayRequestContacts()) {
             return;
         }
 
         getLoaderManager().initLoader(0, null, this);
     }
+
+    /*
+ * Starts the location manager when the app is resumed
+ */
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        locManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10, 0, this);
+    }
+
+
+    /*
+     * Turns off the location manager when the app is paused
+     */
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locManager.removeUpdates(this);
+    }
+
+
 
     private boolean mayRequestContacts() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -289,6 +332,26 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         mEmailView.setAdapter(adapter);
     }
 
+    @Override
+    public void onLocationChanged(Location location) {
+
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
+    }
+
     private interface ProfileQuery {
         String[] PROJECTION = {
                 ContactsContract.CommonDataKinds.Email.ADDRESS,
@@ -322,20 +385,53 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 return false;
             }
 
-            //do the authentication of loggin the user in
-            try {
+            //get the current location of the user
+            if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return null;
+            }
+            userLocation = locManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            double user_lat = userLocation.getLatitude();
+            double user_long = userLocation.getLongitude();
 
+
+            //do the authentication of logging the user in
+            try {
+                //pass the username and password to the authentication script
+                String loginURL = "http://mpss.csce.uark.edu/~team1/check_user.php?";
+                loginURL += "email=" + URLEncoder.encode(mEmail, "UTF-8");
+                loginURL += "&password=" + URLEncoder.encode(mPassword, "UTF-8");
+                loginURL += "&latitude=" + URLEncoder.encode(user_lat + "", "UTF-8");
+                loginURL += "&longitude=" + URLEncoder.encode(user_long + "", "UTF-8");
+                URL url = new URL(loginURL);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+                //
+                try {
+                    conn.setDoInput(true);
+                    conn.setDoOutput(true);
+                    InputStreamReader in = new InputStreamReader(conn.getInputStream());
+                    BufferedReader input = new BufferedReader(in);
+
+                    //get the response from the server to ensure there were not problems in adding the user
+                    String serverResponse = input.readLine();
+
+                    //if the server does not find the username and password
+                    //todo change response to match positive response from server
+                    if (!serverResponse.equals("Connection Succeeded")) {
+                        return false;
+                    }
+                }
+                catch (Exception e) {
+                    return false;
+                }
+
+                //close the connection
+                finally {
+                    conn.disconnect();
+                }
             }
             catch (Exception e) {
-
-            }
-
-            for (String credential : DUMMY_CREDENTIALS) {
-                String[] pieces = credential.split(":");
-                if (pieces[0].equals(mEmail)) {
-                    // Account exists, return true if the password matches.
-                    return pieces[1].equals(mPassword);
-                }
+                return false;
             }
             return true;
         }

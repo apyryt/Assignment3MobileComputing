@@ -1,12 +1,17 @@
 package cmsc491.assignment3_pyryt_washington;
 
+import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.app.LoaderManager.LoaderCallbacks;
 
@@ -31,9 +36,11 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,7 +49,7 @@ import static android.Manifest.permission.READ_CONTACTS;
 /**
  * A login screen that offers login via email/password.
  */
-public class RegisterActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
+public class RegisterActivity extends AppCompatActivity implements LoaderCallbacks<Cursor>, LocationListener {
 
     /**
      * Id to identity READ_CONTACTS permission request.
@@ -66,6 +73,9 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
     private EditText mPasswordView, nameView;
     private View mProgressView;
     private View mLoginFormView;
+
+    private LocationManager locManager;
+    private Location userLocation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,6 +113,33 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
+    }
+
+    /*
+     * Starts the location manager when the app is resumed
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        locManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10, 0, this);
+    }
+
+
+    /*
+     * Turns off the location manager when the app is paused
+     */
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locManager.removeUpdates(this);
     }
 
     private void populateAutoComplete() {
@@ -284,6 +321,26 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
         usernameView.setAdapter(adapter);
     }
 
+    @Override
+    public void onLocationChanged(Location location) {
+
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
+    }
+
 
     private interface ProfileQuery {
         String[] PROJECTION = {
@@ -320,13 +377,25 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
                 return false;
             }
 
+            //get the current location of the user
+            if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return null;
+            }
+            userLocation = locManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            double user_lat = userLocation.getLatitude();
+            double user_long = userLocation.getLongitude();
+
+
             //open the URL for a post request to the database
             try {
-                //String newUser = "http://mpss.csce.uark.edu/~team1/add_user.php?";
-                //newUser += "username=" + URLEncoder.encode(mUsername, "UTF-8");
-                //newUser += "&password=" + URLEncoder.encode(mPassword), "UTF-8");
-                //newUser += "&name=" + URLEncoder.encode(mName, "UTF-8");
-                String newUser = "http://mpss.csce.uark.edu/~team1/add_to_table.php?" + "eventName=finalTest";
+                String newUser = "http://mpss.csce.uark.edu/~team1/add_user.php?";
+                newUser += "email=" + URLEncoder.encode(mUsername, "UTF-8");
+                newUser += "&password=" + URLEncoder.encode(mPassword, "UTF-8");
+                newUser += "&name=" + URLEncoder.encode(mName, "UTF-8");
+                newUser += "&latitude=" + URLEncoder.encode(user_lat + "", "UTF-8");
+                newUser += "&longitude=" + URLEncoder.encode(user_long + "", "UTF-8");
+
+                //String newUser = "http://mpss.csce.uark.edu/~team1/add_to_table.php?" + "eventName=finalTest";
                 URL url = new URL(newUser);
                 HttpURLConnection phpScript = (HttpURLConnection) url.openConnection();
 
@@ -335,24 +404,28 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
                     phpScript.setDoInput(true);
                     phpScript.setDoOutput(true);
                     InputStreamReader in = new InputStreamReader(phpScript.getInputStream());
-                    //BufferedReader input = new BufferedReader(in);
+                    BufferedReader input = new BufferedReader(in);
 
-                    //display a message that the user has been added to the database
-                    //Toast messageDoneToast = Toast.makeText(RegisterActivity.this, "User has been added. Logging in...", Toast.LENGTH_LONG);
-                   // messageDoneToast.show();
+                    //get the response from the server to ensure there were not problems in adding the user
+                    String serverResponse = input.readLine();
+
+                    //if there was a problem making the user
+                    //todo change response to match positive response from server
+                    if (!serverResponse.equals("Connection Succeeded")) {
+                        return false;
+                    }
                 }
                 catch (Exception e) {
-                   // Toast errorToast = Toast.makeText(RegisterActivity.this, "Something went wrong", Toast.LENGTH_LONG);
-                    //errorToast.show();
+                   return false;
                 }
+
+                //close the connection
                 finally {
                     phpScript.disconnect();
-
                 }
             }
             catch (Exception e) {
-               // Toast errorToast = Toast.makeText(RegisterActivity.this, "Something went wrong", Toast.LENGTH_LONG);
-                //errorToast.show();
+                return false;
             }
             return true;
         }
@@ -364,7 +437,11 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
 
             //When we have logged in successfully, go to the maps page
             if (success) {
+                //display a message that we have logged in
+                Toast messageDoneToast = Toast.makeText(RegisterActivity.this, "User has been added. Logging in...", Toast.LENGTH_LONG);
+                messageDoneToast.show();
 
+                //start the maps activity
                 Intent maps = new Intent(getApplicationContext(), MapsActivity.class);
                 startActivity(maps);
                 finish();
