@@ -380,6 +380,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 //add a marker if the distance is within 1000m (1km)
                 usersMarkers.get(i).setVisible(true);
             }
+            else {
+                usersMarkers.get(i).setVisible(false);
+            }
         }
     }
 }
