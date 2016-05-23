@@ -1,3 +1,18 @@
+/*
+    Assignment #3 for CMSC 491
+    Due Date: 4/23/2016
+    Friend Finder App
+    This app allows you to find friends in your area (within a 1km radius). User can create an
+      account, and users within a certain radius will appear on a map.
+    Filename: LoginActivity.java
+        This activity is the first to appear. It allows the user to login to an already existing account
+            in the system. If they don't have an account, they can click the register button to go to
+            the register activity. This activity performs the authentication of the username and password
+            entered by the user.
+    Authors: Amanda Pyryt and Brooke Washington
+*/
+
+
 package cmsc491.assignment3_pyryt_washington;
 
 import android.Manifest;
@@ -37,6 +52,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -51,7 +67,7 @@ import static android.Manifest.permission.READ_CONTACTS;
 /**
  * A login screen that offers login via email/password.
  */
-public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor>, LocationListener {
+public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
 
     /**
      * Id to identity READ_CONTACTS permission request.
@@ -76,10 +92,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private View mProgressView;
     private View mLoginFormView;
 
-    private LocationManager locManager;
-    private Location userLocation;
-
-    ArrayList<String> usersLocations;
+    public static String userInfo;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,7 +125,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             }
         });
 
-        //when the registerInstead button is clicked, the user is taken to a seperate
+        //when the registerInstead button is clicked, the user is taken to a separate
         //  activity where they can register for an account instead of using an existing one
         Button registerInstead = (Button) findViewById(R.id.register_button);
         registerInstead.setOnClickListener(new OnClickListener() {
@@ -127,7 +140,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         mProgressView = findViewById(R.id.login_progress);
     }
 
-        private void populateAutoComplete() {
+    private void populateAutoComplete() {
         if (!mayRequestContacts()) {
             return;
         }
@@ -135,35 +148,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         getLoaderManager().initLoader(0, null, this);
     }
 
-    /*
- * Starts the location manager when the app is resumed
- */
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        locManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        locManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10, 0, this);
-    }
-
-
-    /*
-     * Turns off the location manager when the app is paused
-     */
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        locManager.removeUpdates(this);
-    }
-
-
-
+    //allows the app to request contacts from the user's phone
     private boolean mayRequestContacts() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             return true;
@@ -248,8 +233,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         }
     }
 
+    //ensures that the password is relatively strong
     private boolean isPasswordValid(String password) {
-        //TODO: Replace this with your own logic
         return password.length() > 4;
     }
 
@@ -332,25 +317,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         mEmailView.setAdapter(adapter);
     }
 
-    @Override
-    public void onLocationChanged(Location location) {
-
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
-    }
 
     private interface ProfileQuery {
         String[] PROJECTION = {
@@ -368,8 +334,14 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
      */
     public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
 
+        //the code that will be returned from the server upon success
+        private final int SUCCESS = 5;
+
         private final String mEmail;
         private final String mPassword;
+
+        private String serverRetrievedName = "this is the name";
+        private String serverResponse;
 
         UserLoginTask(String email, String password) {
             mEmail = email;
@@ -378,6 +350,7 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         @Override
         protected Boolean doInBackground(Void... params) {
+
             try {
                 // Simulate network access.
                 Thread.sleep(2000);
@@ -385,39 +358,38 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 return false;
             }
 
-            //get the current location of the user
-            if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                return null;
-            }
-            userLocation = locManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            double user_lat = userLocation.getLatitude();
-            double user_long = userLocation.getLongitude();
-
-
             //do the authentication of logging the user in
             try {
                 //pass the username and password to the authentication script
-                String loginURL = "http://mpss.csce.uark.edu/~team1/check_user.php?";
+                String loginURL = "http://mpss.csce.uark.edu/~team1/Check_user.php?";
                 loginURL += "email=" + URLEncoder.encode(mEmail, "UTF-8");
                 loginURL += "&password=" + URLEncoder.encode(mPassword, "UTF-8");
-                loginURL += "&latitude=" + URLEncoder.encode(user_lat + "", "UTF-8");
-                loginURL += "&longitude=" + URLEncoder.encode(user_long + "", "UTF-8");
+
                 URL url = new URL(loginURL);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
-                //
+                //get the response back from the user
                 try {
                     conn.setDoInput(true);
                     conn.setDoOutput(true);
                     InputStreamReader in = new InputStreamReader(conn.getInputStream());
                     BufferedReader input = new BufferedReader(in);
 
-                    //get the response from the server to ensure there were not problems in adding the user
-                    String serverResponse = input.readLine();
+                    //first thing back will be the error/success code
+                    serverResponse = input.readLine();
 
-                    //if the server does not find the username and password
-                    //todo change response to match positive response from server
-                    if (!serverResponse.equals("Connection Succeeded")) {
+                    //if the server returns a success
+                    if (Integer.parseInt(serverResponse) == SUCCESS) {
+
+                        //if a success, the second thing returned back will be the name of the user
+                        //  who just logged in
+                        serverRetrievedName = input.readLine();
+
+                        return true;
+                    }
+
+                    //if the password/username was wrong
+                    else {
                         return false;
                     }
                 }
@@ -433,7 +405,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             catch (Exception e) {
                 return false;
             }
-            return true;
         }
 
         @Override
@@ -443,10 +414,20 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
             //if the login is successful, end this activity and start the map activity
             if (success) {
+                //display a message that we have logged in
+                Toast messageDoneToast = Toast.makeText(LoginActivity.this, "User has logged in", Toast.LENGTH_LONG);
+                messageDoneToast.show();
+
+                //start the maps activity
                 Intent map = new Intent(LoginActivity.this, MapsActivity.class);
+                map.putExtra(userInfo, serverRetrievedName + ";" + mEmail);
                 startActivity(map);
                 finish();
             } else {
+                //if the user could not log in, display an error
+                Toast messageDoneToast = Toast.makeText(LoginActivity.this, "Error with username and/or password", Toast.LENGTH_LONG);
+                messageDoneToast.show();
+
                 mPasswordView.setError(getString(R.string.error_incorrect_password));
                 mPasswordView.requestFocus();
             }
@@ -459,4 +440,3 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         }
     }
 }
-

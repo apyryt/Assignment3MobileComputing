@@ -1,3 +1,17 @@
+/*
+    Assignment #3 for CMSC 491
+    Due Date: 4/23/2016
+    Friend Finder App
+    This app allows you to find friends in your area (within a 1km radius). User can create an
+      account, and users within a certain radius will appear on a map.
+    Filename: RegisterActivity.java
+        This activity appears when the user wants to make a new account. The user enters their name
+           and creates a password. This information is added to the database along with their current
+           location.
+    Authors: Amanda Pyryt and Brooke Washington
+*/
+
+
 package cmsc491.assignment3_pyryt_washington;
 
 import android.Manifest;
@@ -49,7 +63,7 @@ import static android.Manifest.permission.READ_CONTACTS;
 /**
  * A login screen that offers login via email/password.
  */
-public class RegisterActivity extends AppCompatActivity implements LoaderCallbacks<Cursor>, LocationListener {
+public class RegisterActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
 
     /**
      * Id to identity READ_CONTACTS permission request.
@@ -74,8 +88,7 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
     private View mProgressView;
     private View mLoginFormView;
 
-    private LocationManager locManager;
-    private Location userLocation;
+    public static String userInfo;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,7 +115,7 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
             }
         });
 
-
+        //setting up things
         Button mEmailSignInButton = (Button) findViewById(R.id.registerButton);
         mEmailSignInButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -115,32 +128,6 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
         mProgressView = findViewById(R.id.login_progress);
     }
 
-    /*
-     * Starts the location manager when the app is resumed
-     */
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        locManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        locManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10, 0, this);
-    }
-
-
-    /*
-     * Turns off the location manager when the app is paused
-     */
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        locManager.removeUpdates(this);
-    }
 
     private void populateAutoComplete() {
         if (!mayRequestContacts()) {
@@ -321,26 +308,6 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
         usernameView.setAdapter(adapter);
     }
 
-    @Override
-    public void onLocationChanged(Location location) {
-
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
-    }
-
 
     private interface ProfileQuery {
         String[] PROJECTION = {
@@ -358,9 +325,15 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
      */
     public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
 
+        //the code that will be returned from the server upon success
+        private final int SUCCESS = 5;
+
+        //information to store in the database
         private final String mUsername;
         private final String mPassword;
         private final String mName;
+
+        private String serverResponse;
 
         UserLoginTask(String username, String password, String name) {
             mUsername = username;
@@ -377,25 +350,15 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
                 return false;
             }
 
-            //get the current location of the user
-            if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                return null;
-            }
-            userLocation = locManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            double user_lat = userLocation.getLatitude();
-            double user_long = userLocation.getLongitude();
-
-
             //open the URL for a post request to the database
             try {
                 String newUser = "http://mpss.csce.uark.edu/~team1/add_user.php?";
                 newUser += "email=" + URLEncoder.encode(mUsername, "UTF-8");
                 newUser += "&password=" + URLEncoder.encode(mPassword, "UTF-8");
-                newUser += "&name=" + URLEncoder.encode(mName, "UTF-8");
-                newUser += "&latitude=" + URLEncoder.encode(user_lat + "", "UTF-8");
-                newUser += "&longitude=" + URLEncoder.encode(user_long + "", "UTF-8");
+                newUser += "&username=" + URLEncoder.encode(mName, "UTF-8");
+                newUser += "&latitude=" + URLEncoder.encode("0", "UTF-8");
+                newUser += "&longitude=" + URLEncoder.encode("0", "UTF-8");
 
-                //String newUser = "http://mpss.csce.uark.edu/~team1/add_to_table.php?" + "eventName=finalTest";
                 URL url = new URL(newUser);
                 HttpURLConnection phpScript = (HttpURLConnection) url.openConnection();
 
@@ -407,11 +370,13 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
                     BufferedReader input = new BufferedReader(in);
 
                     //get the response from the server to ensure there were not problems in adding the user
-                    String serverResponse = input.readLine();
+                    serverResponse = input.readLine();
 
                     //if there was a problem making the user
-                    //todo change response to match positive response from server
-                    if (!serverResponse.equals("Connection Succeeded")) {
+                    if (Integer.parseInt(serverResponse) == SUCCESS) {
+                        return true;
+                    }
+                    else {
                         return false;
                     }
                 }
@@ -427,7 +392,7 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
             catch (Exception e) {
                 return false;
             }
-            return true;
+
         }
 
         @Override
@@ -443,11 +408,15 @@ public class RegisterActivity extends AppCompatActivity implements LoaderCallbac
 
                 //start the maps activity
                 Intent maps = new Intent(getApplicationContext(), MapsActivity.class);
+                maps.putExtra(userInfo, mName + ";" + mUsername);
+
                 startActivity(maps);
                 finish();
             } else {
-                mPasswordView.setError(getString(R.string.error_incorrect_password));
-                mPasswordView.requestFocus();
+
+                //display to the user what the problem was
+                Toast errorMessageToast = Toast.makeText(RegisterActivity.this, "Error trying to connect. Please check your connection or try a different username.", Toast.LENGTH_LONG);
+                errorMessageToast.show();
             }
         }
 
