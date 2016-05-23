@@ -32,6 +32,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.BufferedReader;
@@ -46,6 +47,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     GoogleMap mMap;
 
     private ArrayList<String> usersLocations;
+    private ArrayList<Marker> usersMarkers;
 
     private LocationManager locManager;
     private Location userLocation;
@@ -54,6 +56,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private String username;
     private String name;
     LatLng currLoc;
+
+    //the marker of the current user
+    private Marker userMarker;
 
     //keeps track if we have already set a marker for the user - so we do not set more than one
     private boolean markerSet = false;
@@ -75,8 +80,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         //depends if we get it from RegisterActivity or LoginActivity
         try {
             usernameInfo = myIntent.getStringExtra(RegisterActivity.userInfo);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             usernameInfo = myIntent.getStringExtra(LoginActivity.userInfo);
         }
         String[] retrieved = usernameInfo.split(";");
@@ -97,7 +101,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             return;
         }
         locManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10, 0, this);
-        userLocation = locManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
     }
 
 
@@ -130,35 +133,51 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
+        mMap.setMyLocationEnabled(true);
     }
 
     @Override
     public void onLocationChanged(Location location) {
 
+        //get the current location of the user
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        userLocation = locManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+
+        double user_lat = userLocation.getLatitude();
+        double user_long = userLocation.getLongitude();
+        currLoc = new LatLng(user_lat, user_long);
+
+        //create a marker if we haven't already for the current user
         if (!markerSet) {
-
-            double user_lat = userLocation.getLatitude();
-            double user_long = userLocation.getLongitude();
-
-            currLoc = new LatLng(user_lat, user_long);
-
-            //adds a marker with the name of the user at their current location
-            mMap.addMarker(new MarkerOptions()
+            MarkerOptions markerOptions = new MarkerOptions()
                     .position(currLoc)
-                    .title(name));
+                    .title(name);
+
+            //adds the marker to the map
+            userMarker = mMap.addMarker(markerOptions);
+
+            markerSet = true;
+
+            //start the task to get other users from the database
+            FindUsersTask callScript = new FindUsersTask();
+            callScript.execute();
+        }
+        else {
+
+            //updates the position of the user
+            userMarker.setPosition(currLoc);
 
             //zooms the map in so they can see users within 1km
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currLoc, 18));
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currLoc, 16));
 
             //updates the location of the current user in the database
             UpdateDatabase update = new UpdateDatabase();
             update.execute();
 
-            //start the task to get other users from the database
-            FindUsersTask callScript = new FindUsersTask();
-            callScript.execute();
-
-            markerSet = true;
+            //updates the visibility of the other markers
+            updateVisibility();
         }
     }
 
@@ -269,20 +288,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     InputStreamReader in = new InputStreamReader(conn.getInputStream());
                     BufferedReader input = new BufferedReader(in);
 
-                    //todo: update with storing the user's name and location somehow
-
                     //store the names and locations in this arrayList, so we can use them later when we get to the map activity
-                    usersLocations = new ArrayList<String>();
+                    usersLocations = new ArrayList<>();
 
+                    //keeps track of the markers of the other users
+                    usersMarkers = new ArrayList<>();
+
+                    //gets the success/error code
                     serverResponse = input.readLine();
 
+                    //stores the users in an arrayLit
                     if (Integer.parseInt(serverResponse) == SUCCESS) {
 
                         String line = null;
                         while ((line = input.readLine()) != null) {
                             usersLocations.add(line);
                         }
-
                         return true;
                     }
                     else {
@@ -299,8 +320,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         @Override
         protected void onPostExecute(Boolean success) {
 
-            //todo update once we know the structure of how the info is returned from php script
-
             //if there was a problem getting the users, display an error message
             if (!success) {
                 Toast errorMessageToast = Toast.makeText(MapsActivity.this, "Error trying to connect " +
@@ -309,6 +328,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
             else {
                 //go through each location and make a marker on the map
+
+                //tells us the index of the user we are looking at, so we can correspond it with the marker
+                //in the arrayList
+                int count = 0;
                 for (String s : usersLocations) {
 
                     //the info is received name;latitutde;longitude
@@ -320,13 +343,42 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     otherUserLoc.setLatitude(Double.parseDouble(splitInfo[1]));
                     otherUserLoc.setLongitude(Double.parseDouble(splitInfo[2]));
 
-                    //for each location, calculate the distance between it and the user
-                    float distance = userLocation.distanceTo(new Location(otherUserLoc));
-                    if (distance <= 1000) {
-                        //add a marker if the distance is within 1000m (1km)
-                        mMap.addMarker(new MarkerOptions().position(usersLoc).title(usersName));
-                    }
+                    //adds the marker to the list of markers
+                    usersMarkers.add(mMap.addMarker(new MarkerOptions().position(usersLoc).title(usersName)));
+                    //set invisible until we find out how close it is to the user
+                    usersMarkers.get(count).setVisible(false);
+
+                    //calls the function that sets the visibility - the marker is visible if it is within 1km of the user
+                    updateVisibility();
+
+                    count++;
                 }
+            }
+        }
+    }
+
+
+    /*
+     * Updates the visibility of the markers when the user moves around
+     */
+
+    protected void updateVisibility () {
+
+        //sets the visibility of every marker on the map
+        for (int i = 0; i < usersMarkers.size(); i++) {
+
+            //calculates the users distance and sets their visibility
+            //the info is received name;latitutde;longitude
+            String[] splitInfo = usersLocations.get(i).split(";");
+
+            Location otherUserLoc = new Location("");
+            otherUserLoc.setLatitude(Double.parseDouble(splitInfo[1]));
+            otherUserLoc.setLongitude(Double.parseDouble(splitInfo[2]));
+
+            float distance = userLocation.distanceTo(new Location(otherUserLoc));
+            if (distance <= 1000) {
+                //add a marker if the distance is within 1000m (1km)
+                usersMarkers.get(i).setVisible(true);
             }
         }
     }
