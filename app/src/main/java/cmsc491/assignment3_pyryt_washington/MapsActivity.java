@@ -55,6 +55,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private String name;
     LatLng currLoc;
 
+    //keeps track if we have already set a marker for the user - so we do not set more than one
+    private boolean markerSet = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -132,26 +135,31 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onLocationChanged(Location location) {
 
-        double user_lat = userLocation.getLatitude();
-        double user_long = userLocation.getLongitude();
+        if (!markerSet) {
 
-        currLoc = new LatLng(user_lat, user_long);
+            double user_lat = userLocation.getLatitude();
+            double user_long = userLocation.getLongitude();
 
-        //adds a marker with the name of the user at their current location
-        mMap.addMarker(new MarkerOptions()
-                .position(currLoc)
-                .title(name));
+            currLoc = new LatLng(user_lat, user_long);
 
-        //zooms the map in so they can see users within 1km
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currLoc, 18));
+            //adds a marker with the name of the user at their current location
+            mMap.addMarker(new MarkerOptions()
+                    .position(currLoc)
+                    .title(name));
 
-        //updates the location of the current user in the database
-        UpdateDatabase update = new UpdateDatabase();
-        update.execute();
+            //zooms the map in so they can see users within 1km
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currLoc, 18));
 
-        //start the task to get other users from the database
-        //FindUsersTask callScript = new FindUsersTask();
-        //callScript.execute();
+            //updates the location of the current user in the database
+            UpdateDatabase update = new UpdateDatabase();
+            update.execute();
+
+            //start the task to get other users from the database
+            FindUsersTask callScript = new FindUsersTask();
+            callScript.execute();
+
+            markerSet = true;
+        }
     }
 
     @Override
@@ -240,12 +248,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      */
     public class FindUsersTask extends AsyncTask<Void, Void, Boolean> {
 
+        private String serverResponse;
+
+        //the code that will be returned from the server upon success
+        private final int SUCCESS = 5;
+
         @Override
         protected Boolean doInBackground(Void... params) {
 
             //execute the script to begin retrieving users
             try {
-                String findUserPhpScript = "http://mpss.csce.uark.edu/~team1/get_users.php";
+                String findUserPhpScript = "http://mpss.csce.uark.edu/~team1/Find_locations.php";
                 URL url = new URL(findUserPhpScript);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
@@ -261,9 +274,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     //store the names and locations in this arrayList, so we can use them later when we get to the map activity
                     usersLocations = new ArrayList<String>();
 
-                    String line = null;
-                    while ((line = input.readLine()) != null) {
-                        usersLocations.add(line);
+                    serverResponse = input.readLine();
+
+                    if (Integer.parseInt(serverResponse) == SUCCESS) {
+
+                        String line = null;
+                        while ((line = input.readLine()) != null) {
+                            usersLocations.add(line);
+                        }
+
+                        return true;
+                    }
+                    else {
+                        return false;
                     }
                 } catch (Exception e) {
                     return false;
@@ -271,7 +294,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } catch (Exception e) {
                 return false;
             }
-            return true;
         }
 
         @Override
@@ -288,15 +310,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             else {
                 //go through each location and make a marker on the map
                 for (String s : usersLocations) {
+
+                    //the info is received name;latitutde;longitude
+                    String[] splitInfo = s.split(";");
+                    LatLng usersLoc = new LatLng(Double.parseDouble(splitInfo[1]), Double.parseDouble(splitInfo[2]));
+                    String usersName = splitInfo[0];
+
+                    Location otherUserLoc = new Location("");
+                    otherUserLoc.setLatitude(Double.parseDouble(splitInfo[1]));
+                    otherUserLoc.setLongitude(Double.parseDouble(splitInfo[2]));
+
                     //for each location, calculate the distance between it and the user
-                    //float distance = userLocation.distanceTo(new Location(45.0, 32.9));
-                    //if (distance <= 1000) {
-                    //add a marker if the distance is within 1000m (1km)
-                    LatLng userLocation = new LatLng(12, 12);
-                    String usersName = "name";
-                    mMap.addMarker(new MarkerOptions().position(userLocation).title(usersName));
-                    //}
-                    //calculate distance
+                    float distance = userLocation.distanceTo(new Location(otherUserLoc));
+                    if (distance <= 1000) {
+                        //add a marker if the distance is within 1000m (1km)
+                        mMap.addMarker(new MarkerOptions().position(usersLoc).title(usersName));
+                    }
                 }
             }
         }
